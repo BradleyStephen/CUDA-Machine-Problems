@@ -1,0 +1,2 @@
+Academic Integrity Notice
+This repository is provided solely for personal use and educational purposes. The code, examples, and documentation contained herein are intended as learning resources and should not be submitted as your own work for academic credit. By using or adapting any part of this repository, you agree that you will not present this work as your original creation. I am not responsible for any academic misconduct arising from the misuse of this content.
