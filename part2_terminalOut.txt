@@ -1,0 +1,178 @@
+----- Matrix Dimension: 256x256, Block Width: 2 -----
+Host-to-Device Transfer: 0.102 ms
+GPU Kernel Execution: 10.821 ms
+Device-to-Host Transfer: 0.149 ms
+CPU Computation Time: 25.000 ms
+Test PASSED: GPU and CPU results are equivalent!
+
+----- Matrix Dimension: 256x256, Block Width: 4 -----
+Host-to-Device Transfer: 0.134 ms
+GPU Kernel Execution: 3.380 ms
+Device-to-Host Transfer: 0.092 ms
+CPU Computation Time: 25.000 ms
+Test PASSED: GPU and CPU results are equivalent!
+
+----- Matrix Dimension: 256x256, Block Width: 8 -----
+Host-to-Device Transfer: 0.249 ms
+GPU Kernel Execution: 0.989 ms
+Device-to-Host Transfer: 0.070 ms
+CPU Computation Time: 25.000 ms
+Test PASSED: GPU and CPU results are equivalent!
+
+----- Matrix Dimension: 256x256, Block Width: 16 -----
+Host-to-Device Transfer: 0.092 ms
+GPU Kernel Execution: 0.761 ms
+Device-to-Host Transfer: 0.092 ms
+CPU Computation Time: 25.000 ms
+Test PASSED: GPU and CPU results are equivalent!
+
+----- Matrix Dimension: 256x256, Block Width: 32 -----
+Host-to-Device Transfer: 0.126 ms
+GPU Kernel Execution: 0.988 ms
+Device-to-Host Transfer: 0.098 ms
+CPU Computation Time: 25.000 ms
+Test PASSED: GPU and CPU results are equivalent!
+
+----- Matrix Dimension: 512x512, Block Width: 2 -----
+Host-to-Device Transfer: 0.221 ms
+GPU Kernel Execution: 81.478 ms
+Device-to-Host Transfer: 0.241 ms
+CPU Computation Time: 205.000 ms
+Test PASSED: GPU and CPU results are equivalent!
+
+----- Matrix Dimension: 512x512, Block Width: 4 -----
+Host-to-Device Transfer: 0.214 ms
+GPU Kernel Execution: 20.770 ms
+Device-to-Host Transfer: 0.205 ms
+CPU Computation Time: 206.000 ms
+Test PASSED: GPU and CPU results are equivalent!
+
+----- Matrix Dimension: 512x512, Block Width: 8 -----
+Host-to-Device Transfer: 0.204 ms
+GPU Kernel Execution: 6.289 ms
+Device-to-Host Transfer: 0.275 ms
+CPU Computation Time: 205.000 ms
+Test PASSED: GPU and CPU results are equivalent!
+
+----- Matrix Dimension: 512x512, Block Width: 16 -----
+Host-to-Device Transfer: 0.234 ms
+GPU Kernel Execution: 3.851 ms
+Device-to-Host Transfer: 0.248 ms
+CPU Computation Time: 203.000 ms
+Test PASSED: GPU and CPU results are equivalent!
+
+----- Matrix Dimension: 512x512, Block Width: 32 -----
+Host-to-Device Transfer: 0.235 ms
+GPU Kernel Execution: 5.486 ms
+Device-to-Host Transfer: 0.230 ms
+CPU Computation Time: 200.000 ms
+Test PASSED: GPU and CPU results are equivalent!
+
+----- Matrix Dimension: 1024x1024, Block Width: 2 -----
+Host-to-Device Transfer: 0.599 ms
+GPU Kernel Execution: 558.499 ms
+Device-to-Host Transfer: 0.458 ms
+CPU Computation Time: 2208.000 ms
+Test PASSED: GPU and CPU results are equivalent!
+
+----- Matrix Dimension: 1024x1024, Block Width: 4 -----
+Host-to-Device Transfer: 0.798 ms
+GPU Kernel Execution: 189.027 ms
+Device-to-Host Transfer: 0.734 ms
+CPU Computation Time: 2247.000 ms
+Test PASSED: GPU and CPU results are equivalent!
+
+----- Matrix Dimension: 1024x1024, Block Width: 8 -----
+Host-to-Device Transfer: 3.663 ms
+GPU Kernel Execution: 143.367 ms
+Device-to-Host Transfer: 0.544 ms
+CPU Computation Time: 2242.000 ms
+Test PASSED: GPU and CPU results are equivalent!
+
+----- Matrix Dimension: 1024x1024, Block Width: 16 -----
+Host-to-Device Transfer: 4.152 ms
+GPU Kernel Execution: 201.622 ms
+Device-to-Host Transfer: 0.472 ms
+CPU Computation Time: 2330.000 ms
+Test PASSED: GPU and CPU results are equivalent!
+
+----- Matrix Dimension: 1024x1024, Block Width: 32 -----
+Host-to-Device Transfer: 1.667 ms
+GPU Kernel Execution: 197.846 ms
+Device-to-Host Transfer: 0.538 ms
+CPU Computation Time: 2230.000 ms
+Test PASSED: GPU and CPU results are equivalent!
+
+----- Matrix Dimension: 2048x2048, Block Width: 2 -----
+Host-to-Device Transfer: 5.784 ms
+GPU Kernel Execution: 4476.371 ms
+Device-to-Host Transfer: 1.488 ms
+CPU Computation Time: 20084.000 ms
+Test PASSED: GPU and CPU results are equivalent!
+
+----- Matrix Dimension: 2048x2048, Block Width: 4 -----
+Host-to-Device Transfer: 17.607 ms
+GPU Kernel Execution: 1152.347 ms
+Device-to-Host Transfer: 1.860 ms
+CPU Computation Time: 18984.000 ms
+Test PASSED: GPU and CPU results are equivalent!
+
+----- Matrix Dimension: 2048x2048, Block Width: 8 -----
+Host-to-Device Transfer: 11.500 ms
+GPU Kernel Execution: 606.081 ms
+Device-to-Host Transfer: 1.376 ms
+CPU Computation Time: 18778.000 ms
+Test PASSED: GPU and CPU results are equivalent!
+
+----- Matrix Dimension: 2048x2048, Block Width: 16 -----
+Host-to-Device Transfer: 11.425 ms
+GPU Kernel Execution: 384.490 ms
+Device-to-Host Transfer: 1.479 ms
+CPU Computation Time: 19645.000 ms
+Test PASSED: GPU and CPU results are equivalent!
+
+----- Matrix Dimension: 2048x2048, Block Width: 32 -----
+Host-to-Device Transfer: 11.492 ms
+GPU Kernel Execution: 478.991 ms
+Device-to-Host Transfer: 1.430 ms
+CPU Computation Time: 18919.000 ms
+Test PASSED: GPU and CPU results are equivalent!
+
+----- Matrix Dimension: 4096x4096, Block Width: 2 -----
+Host-to-Device Transfer: 43.215 ms
+GPU Kernel Execution: 33524.566 ms
+Device-to-Host Transfer: 5.350 ms
+CPU Computation Time: 743847.000 ms
+Test PASSED: GPU and CPU results are equivalent!
+
+----- Matrix Dimension: 4096x4096, Block Width: 4 -----
+Host-to-Device Transfer: 42.540 ms
+GPU Kernel Execution: 8570.741 ms
+Device-to-Host Transfer: 5.321 ms
+CPU Computation Time: 799369.000 ms
+Test PASSED: GPU and CPU results are equivalent!
+
+----- Matrix Dimension: 4096x4096, Block Width: 8 -----
+Host-to-Device Transfer: 43.307 ms
+GPU Kernel Execution: 2318.309 ms
+Device-to-Host Transfer: 5.641 ms
+CPU Computation Time: 756381.000 ms
+Test PASSED: GPU and CPU results are equivalent!
+
+----- Matrix Dimension: 4096x4096, Block Width: 16 -----
+Host-to-Device Transfer: 43.701 ms
+GPU Kernel Execution: 1811.341 ms
+Device-to-Host Transfer: 5.290 ms
+CPU Computation Time: 748931.938 ms
+Test PASSED: GPU and CPU results are equivalent!
+
+----- Matrix Dimension: 4096x4096, Block Width: 32 -----
+Host-to-Device Transfer: 42.653 ms
+GPU Kernel Execution: 2420.314 ms
+Device-to-Host Transfer: 5.511 ms
+CPU Computation Time: 740162.000 ms
+Test PASSED: GPU and CPU results are equivalent!
+
+
+C:\Users\19bbs2\source\repos\MP1_ELEC374_BradleyStephen\x64\Debug\MP1_ELEC374_BradleyStephen.exe (process 12272) exited with code 0.
+Press any key to close this window . . .

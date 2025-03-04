@@ -1,175 +1,184 @@
 // Bradley Stephen | 19bbs2 | 20207842
-// Machine problem 1 | Part 1 | ELEC 374
-#include <cuda_runtime.h>
+// March 4th, 2025
+// ELEC 374 - Machine Problem 1 - Part 2
+
 #include <stdio.h>
 #include <stdlib.h>
+#include <cuda_runtime.h>
+#include <device_launch_parameters.h>
 #include <math.h>
 #include <time.h>
-#include "device_launch_parameters.h"
 
-// GPU Kernel for Matrix Multiplication
-// Each thread computes one element of the output matrix.
-__global__ void gpuMatrixMultiplyKernel(float* d_P, float* d_M, float* d_N, int matrixDim) {
+// using to account for small diffs in FP arthimiteic betweehn cpu and gpu
+#define TOLERANCE 1e-3f
+
+// GPU kernel, each thread computes one element of output 
+__global__ void gpuMatrixMultiply(const float* matA, const float* matB, float* matC, int dim) {
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     int col = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (row < matrixDim && col < matrixDim) {
-        float value = 0.0f;
-        for (int k = 0; k < matrixDim; k++) {
-            value += d_M[row * matrixDim + k] * d_N[k * matrixDim + col];
+    if (row < dim && col < dim) {
+        float sum = 0.0f;
+        for (int k = 0; k < dim; ++k) {
+            sum += matA[row * dim + k] * matB[k * dim + col];
         }
-        d_P[row * matrixDim + col] = value;
+        matC[row * dim + col] = sum;
     }
 }
 
-// CPU Implementation for Matrix Multiplication (for verification)
-void cpuMatrixMultiply(float* result, float* A, float* B, int matrixDim) {
-    for (int i = 0; i < matrixDim; i++) {
-        for (int j = 0; j < matrixDim; j++) {
+// CPU version 
+void cpuMatrixMultiply(const float* matA, const float* matB, float* matC, int dim) {
+    for (int i = 0; i < dim; ++i) {
+        for (int j = 0; j < dim; ++j) {
             float sum = 0.0f;
-            for (int k = 0; k < matrixDim; k++) {
-                sum += A[i * matrixDim + k] * B[k * matrixDim + j];
+            for (int k = 0; k < dim; ++k) {
+                sum += matA[i * dim + k] * matB[k * dim + j];
             }
-            result[i * matrixDim + j] = sum;
+            matC[i * dim + j] = sum;
         }
     }
 }
 
-// Compare two matrices with a given tolerance.
-bool verifyMatrices(float* mat1, float* mat2, int matrixDim, float tol) {
-    for (int i = 0; i < matrixDim * matrixDim; i++) {
-        if (fabsf(mat1[i] - mat2[i]) > tol) {
-            return false;
-        }
+// Compare gpu and cpu matracies with given tolerance of 1e-3f
+int compareMatrices(const float* mat1, const float* mat2, int dim, float tol) {
+    int totalElements = dim * dim;
+    for (int i = 0; i < totalElements; ++i) {
+        if (fabs(mat1[i] - mat2[i]) > tol)
+            return 0;
     }
-    return true;
+    return 1;
 }
 
+/*Run one experiment with the specified matrix dimension and block size.
+  Once working ill re run epxerince for all matrix an block variation in main
+  and store results in CSV to plot in excel later.*/ 
+void runExperiment(int dim, int blockSize, FILE* csvTransfer, FILE* csvKernel, FILE* csvCpuGpu) {
+    size_t totalBytes = dim * dim * sizeof(float);
 
-/* Main runs experiments on different matrix and block sizes, measures data
-   transfer times, kernel execution, and CPU multiplication for verification.*/
-int main() {
-    // Experiment with various matrix dimensions and CUDA block widths for analysis.
-    int matrixSizes[] = { 256, 512, 1024, 2048, 4096 };
-    int blockWidths[] = { 2, 4, 8, 16, 32 };
+    // Allocate host mem
+    float* hostA = (float*)malloc(totalBytes);
+    float* hostB = (float*)malloc(totalBytes);
+    float* hostC_gpu = (float*)malloc(totalBytes);
+    float* hostC_cpu = (float*)malloc(totalBytes);
+    if (!hostA || !hostB || !hostC_gpu || !hostC_cpu) {
+        printf("Failed to allocate host memory for dimension %d.\n", dim);
+        exit(EXIT_FAILURE);
+    }
 
-    // Files for recording timing data and to use in plots.
-    FILE* fileH2D = fopen("data_transfers_logs.txt", "w");
-    FILE* fileKernel = fopen("kernel_time_logs.txt", "w");
-    FILE* fileCPUvsGPU = fopen("cpu_gpu_time_logs.txt", "w");
+    // Init matrices with random vals
+    srand((unsigned)time(NULL));
+    for (int i = 0; i < dim * dim; ++i) {
+        hostA[i] = (float)(rand() % 100) / 10.0f;
+        hostB[i] = (float)(rand() % 100) / 10.0f;
+    }
 
-    fprintf(fileH2D, "Matrix_Size,Host_to_Device,Device_to_Host\n");
-    fprintf(fileKernel, "Matrix_Size,Block_Size,GPU_Kernel_Time\n");
-    fprintf(fileCPUvsGPU, "Matrix_Size,CPU_Time,GPU_Time\n");
+    // Allocate device mem
+    float* devA, * devB, * devC;
+    cudaMalloc((void**)&devA, totalBytes);
+    cudaMalloc((void**)&devB, totalBytes);
+    cudaMalloc((void**)&devC, totalBytes);
 
-    // Loop over different matrix sizes.
-    for (int ms = 0; ms < 5; ms++) {
-        // Loop over different block sizes.
-        for (int bs = 0; bs < 5; bs++) {
-            int matrixDim = matrixSizes[ms];
-            int blockSize = blockWidths[bs];
-            size_t bytes = matrixDim * matrixDim * sizeof(float);
+    // Create CUDA events for timing
+    cudaEvent_t startEvent, stopEvent;
+    cudaEventCreate(&startEvent);
+    cudaEventCreate(&stopEvent);
 
-            printf("\n===== Matrix Dimension: %d x %d, Block Width: %d =====\n", matrixDim, matrixDim, blockSize);
+    // Measure H2D transfer time
+    cudaEventRecord(startEvent, 0);
+    cudaMemcpy(devA, hostA, totalBytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(devB, hostB, totalBytes, cudaMemcpyHostToDevice);
+    cudaEventRecord(stopEvent, 0);
+    cudaEventSynchronize(stopEvent);
+    float h2dTime = 0.0f;
+    cudaEventElapsedTime(&h2dTime, startEvent, stopEvent);
 
-            // Allocate host memory.
-            float* h_A = (float*)malloc(bytes);
-            float* h_B = (float*)malloc(bytes);
-            float* h_gpuResult = (float*)malloc(bytes);
-            float* h_cpuResult = (float*)malloc(bytes);
-            if (!h_A || !h_B || !h_gpuResult || !h_cpuResult) {
-                printf("Error allocating host memory.\n");
-                return -1;
-            }
+    // Set up grid and block dims
+    dim3 threadsPerBlock(blockSize, blockSize);
+    dim3 numBlocks((dim + blockSize - 1) / blockSize, (dim + blockSize - 1) / blockSize);
 
-            // Initialize input matrices with random float values.
-            srand((unsigned)time(NULL));
-            for (int i = 0; i < matrixDim * matrixDim; i++) {
-                h_A[i] = (float)(rand() % 100) / 10.0f;
-                h_B[i] = (float)(rand() % 100) / 10.0f;
-            }
+    // Measure GPU kernel EX time
+    cudaEventRecord(startEvent, 0);
+    gpuMatrixMultiply<<<numBlocks, threadsPerBlock >>>(devA, devB, devC, dim);
+    cudaEventRecord(stopEvent, 0);
+    cudaEventSynchronize(stopEvent);
+    float kernelTime = 0.0f;
+    cudaEventElapsedTime(&kernelTime, startEvent, stopEvent);
 
-            // Allocate device memory.
-            float* d_A, * d_B, * d_P;
-            cudaMalloc((void**)&d_A, bytes);
-            cudaMalloc((void**)&d_B, bytes);
-            cudaMalloc((void**)&d_P, bytes);
+    // Measure D2H transfer time.
+    cudaEventRecord(startEvent, 0);
+    cudaMemcpy(hostC_gpu, devC, totalBytes, cudaMemcpyDeviceToHost);
+    cudaEventRecord(stopEvent, 0);
+    cudaEventSynchronize(stopEvent);
+    float d2hTime = 0.0f;
+    cudaEventElapsedTime(&d2hTime, startEvent, stopEvent);
 
-            // Create CUDA events for timing.
-            cudaEvent_t startEvent, stopEvent;
-            cudaEventCreate(&startEvent);
-            cudaEventCreate(&stopEvent);
-            float elapsedTime = 0.0f;
+    // Measure CPU matrix mul time
+    clock_t cpuStart = clock();
+    cpuMatrixMultiply(hostA, hostB, hostC_cpu, dim);
+    clock_t cpuEnd = clock();
+    float cpuTime = 1000.0f * (cpuEnd - cpuStart) / CLOCKS_PER_SEC;
 
-            // Measure Host-to-Device memory copy time.
-            cudaEventRecord(startEvent, 0);
-            cudaMemcpy(d_A, h_A, bytes, cudaMemcpyHostToDevice);
-            cudaMemcpy(d_B, h_B, bytes, cudaMemcpyHostToDevice);
-            cudaEventRecord(stopEvent, 0);
-            cudaEventSynchronize(stopEvent);
-            cudaEventElapsedTime(&elapsedTime, startEvent, stopEvent);
-            printf("Host-to-Device Transfer: %.3f ms\n", elapsedTime);
-            float h2dTime = elapsedTime;
+    // Validate GPU result
+    int testPassed = compareMatrices(hostC_gpu, hostC_cpu, dim, TOLERANCE);
 
-            // Setup execution configuration.
-            dim3 threads(blockSize, blockSize);
-            dim3 blocks((matrixDim + blockSize - 1) / blockSize,
-                (matrixDim + blockSize - 1) / blockSize);
+    // Print to terminal for clarity
+    printf("----- Matrix Dimension: %dx%d, Block Width: %d -----\n", dim, dim, blockSize);
+    printf("Host-to-Device Transfer: %.3f ms\n", h2dTime);
+    printf("GPU Kernel Execution: %.3f ms\n", kernelTime);
+    printf("Device-to-Host Transfer: %.3f ms\n", d2hTime);
+    printf("CPU Computation Time: %.3f ms\n", cpuTime);
+    if (testPassed)
+        printf("Test PASSED: GPU and CPU results are equivalent!\n\n");
+    else
+        printf("Test FAILED: GPU and CPU results do not match.\n\n");
 
-            // Execute the GPU kernel and time it.
-            cudaEventRecord(startEvent, 0);
-            gpuMatrixMultiplyKernel<<<blocks, threads >>>(d_P, d_A, d_B, matrixDim);
-            cudaEventRecord(stopEvent, 0);
-            cudaEventSynchronize(stopEvent);
-            cudaEventElapsedTime(&elapsedTime, startEvent, stopEvent);
-            printf("GPU Kernel Execution: %.3f ms\n", elapsedTime);
-            float kernelTime = elapsedTime;
+    // Write timing data to CSV files.
+    fprintf(csvTransfer, "%d,%.3f,%.3f\n", dim, h2dTime, d2hTime);
+    fprintf(csvKernel, "%d,%d,%.3f\n", dim, blockSize, kernelTime);
+    fprintf(csvCpuGpu, "%d,%.3f,%.3f\n", dim, cpuTime, kernelTime);
 
-            // Measure Device-to-Host memory copy time.
-            cudaEventRecord(startEvent, 0);
-            cudaMemcpy(h_gpuResult, d_P, bytes, cudaMemcpyDeviceToHost);
-            cudaEventRecord(stopEvent, 0);
-            cudaEventSynchronize(stopEvent);
-            cudaEventElapsedTime(&elapsedTime, startEvent, stopEvent);
-            printf("Device-to-Host Transfer: %.3f ms\n", elapsedTime);
-            float d2hTime = elapsedTime;
+    // Clean up device and host resources.
+    cudaFree(devA);
+    cudaFree(devB);
+    cudaFree(devC);
+    free(hostA);
+    free(hostB);
+    free(hostC_gpu);
+    free(hostC_cpu);
+    cudaEventDestroy(startEvent);
+    cudaEventDestroy(stopEvent);
+}
 
-            // CPU-based matrix multiplication for validation.
-            clock_t cpuStart = clock();
-            cpuMatrixMultiply(h_cpuResult, h_A, h_B, matrixDim);
-            clock_t cpuEnd = clock();
-            float cpuTime = 1000.0f * (cpuEnd - cpuStart) / CLOCKS_PER_SEC;
-            printf("CPU Computation Time: %.3f ms\n", cpuTime);
+int main(void) {
+    // Define matrix/block sizes for testing
+    int matrixSizes[5] = { 256, 512, 1024, 2048, 4096 };
+    int blockSizes[5] = { 2, 4, 8, 16, 32 };
 
-            // Validate the GPU result against the CPU result.
-            if (verifyMatrices(h_gpuResult, h_cpuResult, matrixDim, 1e-3f)) {
-                printf("Test PASSED: GPU and CPU results are equivalent!\n");
-            }
-            else {
-                printf("Test FAILED: Mismatch between GPU and CPU results.\n");
-            }
+    // Open CSVs for writing the results and ploting later
+    FILE* csvDataTrans = fopen("data_transfer_times.csv", "w");
+    FILE* csvKernelTime = fopen("kernel_times.csv", "w");
+    FILE* csvCpuVsGpu = fopen("cpu_vs_gpu_times.csv", "w");
+    if (!csvDataTrans || !csvKernelTime || !csvCpuVsGpu) {
+        printf("Error opening CSV files.\n");
+        return EXIT_FAILURE;
+    }
 
-            // Write timing results to files.
-            fprintf(fileH2D, "%d,%.3f,%.3f\n", matrixDim, h2dTime, d2hTime);
-            fprintf(fileKernel, "%d,%d,%.3f\n", matrixDim, blockSize, kernelTime);
-            fprintf(fileCPUvsGPU, "%d,%.3f,%.3f\n", matrixDim, cpuTime, kernelTime);
+    // CSV Headerss.
+    fprintf(csvDataTrans, "Matrix_Size,HostToDevice,DeviceToHost\n");
+    fprintf(csvKernelTime, "Matrix_Size,Block_Size,Kernel_Time\n");
+    fprintf(csvCpuVsGpu, "Matrix_Size,CPU_Time,GPU_Time\n");
 
-            // Free allocated resources.
-            free(h_A);
-            free(h_B);
-            free(h_gpuResult);
-            free(h_cpuResult);
-            cudaFree(d_A);
-            cudaFree(d_B);
-            cudaFree(d_P);
-            cudaEventDestroy(startEvent);
-            cudaEventDestroy(stopEvent);
+    // Run experiments for all matrix/block configurations.
+    for (int i = 0; i < 5; ++i) {
+        for (int j = 0; j < 5; ++j) {
+            runExperiment(matrixSizes[i], blockSizes[j], csvDataTrans, csvKernelTime, csvCpuVsGpu);
         }
     }
 
-    fclose(fileH2D);
-    fclose(fileKernel);
-    fclose(fileCPUvsGPU);
+    // Close CSVs.
+    fclose(csvDataTrans);
+    fclose(csvKernelTime);
+    fclose(csvCpuVsGpu);
 
     return 0;
 }
