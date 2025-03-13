@@ -10,8 +10,8 @@
 #include <time.h>
 
 #define TOLERANCE 1e-3f
-#define NUM_ITER 10  // Number of iterations per configuration (for Part 3)
-#define SINGLETHREAD 10 // For single-thread experiments (Part 2)
+#define NUM_ITER 10     // Number of iterations per configuration (for Part 1 & 3)
+#define SINGLETHREAD 5 // For single-thread experiments (Part 2)
 
 /* ----------------- GPU Kernels ----------------- */
 
@@ -70,7 +70,7 @@ int compareMatrices(const float* mat1, const float* mat2, int dim, float tol) {
 
 /* ----------------- Experiment Functions ----------------- */
 
-// Data Transfer Experiment: Measure H2D and D2H transfer times.
+// Part 1: Data Transfer Experiment: Measure H2D and D2H transfer times over NUM_ITER iterations.
 void runDataTransferExperiment(int dim, FILE* csvTransfer) {
     size_t totalBytes = dim * dim * sizeof(float);
     float* hostA = (float*)malloc(totalBytes);
@@ -87,33 +87,54 @@ void runDataTransferExperiment(int dim, FILE* csvTransfer) {
     float* devA, * devB;
     cudaMalloc((void**)&devA, totalBytes);
     cudaMalloc((void**)&devB, totalBytes);
+
     cudaEvent_t startEvent, stopEvent;
     cudaEventCreate(&startEvent);
     cudaEventCreate(&stopEvent);
-    // Measure Host-to-Device transfer time.
-    cudaEventRecord(startEvent, 0);
-    cudaMemcpy(devA, hostA, totalBytes, cudaMemcpyHostToDevice);
-    cudaMemcpy(devB, hostB, totalBytes, cudaMemcpyHostToDevice);
-    cudaEventRecord(stopEvent, 0);
-    cudaEventSynchronize(stopEvent);
-    float h2dTime = 0.0f;
-    cudaEventElapsedTime(&h2dTime, startEvent, stopEvent);
-    // Measure Device-to-Host transfer time.
-    float* hostResultA = (float*)malloc(totalBytes);
-    float* hostResultB = (float*)malloc(totalBytes);
-    cudaEventRecord(startEvent, 0);
-    cudaMemcpy(hostResultA, devA, totalBytes, cudaMemcpyDeviceToHost);
-    cudaMemcpy(hostResultB, devB, totalBytes, cudaMemcpyDeviceToHost);
-    cudaEventRecord(stopEvent, 0);
-    cudaEventSynchronize(stopEvent);
-    float d2hTime = 0.0f;
-    cudaEventElapsedTime(&d2hTime, startEvent, stopEvent);
-    printf("Data Transfer Experiment: Matrix %dx%d: H2D = %.3f ms, D2H = %.3f ms\n", dim, dim, h2dTime, d2hTime);
-    fprintf(csvTransfer, "%d,%.3f,%.3f\n", dim, h2dTime, d2hTime);
+
+    float sumH2D = 0, sumD2H = 0, sqSumH2D = 0, sqSumD2H = 0;
+
+    for (int iter = 0; iter < NUM_ITER; ++iter) {
+        // Measure Host-to-Device transfer time.
+        cudaEventRecord(startEvent, 0);
+        cudaMemcpy(devA, hostA, totalBytes, cudaMemcpyHostToDevice);
+        cudaMemcpy(devB, hostB, totalBytes, cudaMemcpyHostToDevice);
+        cudaEventRecord(stopEvent, 0);
+        cudaEventSynchronize(stopEvent);
+        float h2dTime = 0.0f;
+        cudaEventElapsedTime(&h2dTime, startEvent, stopEvent);
+
+        // Measure Device-to-Host transfer time.
+        float* hostResultA = (float*)malloc(totalBytes);
+        float* hostResultB = (float*)malloc(totalBytes);
+        cudaEventRecord(startEvent, 0);
+        cudaMemcpy(hostResultA, devA, totalBytes, cudaMemcpyDeviceToHost);
+        cudaMemcpy(hostResultB, devB, totalBytes, cudaMemcpyDeviceToHost);
+        cudaEventRecord(stopEvent, 0);
+        cudaEventSynchronize(stopEvent);
+        float d2hTime = 0.0f;
+        cudaEventElapsedTime(&d2hTime, startEvent, stopEvent);
+
+        sumH2D += h2dTime;
+        sumD2H += d2hTime;
+        sqSumH2D += h2dTime * h2dTime;
+        sqSumD2H += d2hTime * d2hTime;
+
+        free(hostResultA);
+        free(hostResultB);
+    }
+
+    float avgH2D = sumH2D / NUM_ITER;
+    float avgD2H = sumD2H / NUM_ITER;
+    float stdH2D = sqrt(sqSumH2D / NUM_ITER - avgH2D * avgH2D);
+    float stdD2H = sqrt(sqSumD2H / NUM_ITER - avgD2H * avgD2H);
+
+    printf("Data Transfer Experiment: Matrix %dx%d: H2D = %.3f ms, Std = %.3f ms, D2H = %.3f ms, Std = %.3f ms\n",
+        dim, dim, avgH2D, stdH2D, avgD2H, stdD2H);
+    fprintf(csvTransfer, "%d,%.3f,%.3f,%.3f,%.3f\n", dim, avgH2D, stdH2D, avgD2H, stdD2H);
+
     free(hostA);
     free(hostB);
-    free(hostResultA);
-    free(hostResultB);
     cudaFree(devA);
     cudaFree(devB);
     cudaEventDestroy(startEvent);
@@ -155,7 +176,7 @@ void runSingleThreadExperiment(int dim, FILE* csvSingleThread) {
     for (int iter = 0; iter < SINGLETHREAD; ++iter) {
         // Run the single-thread kernel.
         cudaEventRecord(startEvent, 0);
-        gpuMatrixMultiplySingleThread<<<1, 1 >>>(devA, devB, devC, dim);
+        gpuMatrixMultiplySingleThread << <1, 1 >> > (devA, devB, devC, dim);
         cudaEventRecord(stopEvent, 0);
         cudaEventSynchronize(stopEvent);
         float kernelTime = 0;
@@ -183,13 +204,13 @@ void runSingleThreadExperiment(int dim, FILE* csvSingleThread) {
     float stdCpu = sqrt(sqSumCpu / SINGLETHREAD - avgCpu * avgCpu);
 
     printf("----- Matrix Dimension: %dx%d -----\n", dim, dim);
-    printf("GPU Kernel Execution (Single Thread): Avg = %.3f ms, StdDev = %.3f ms\n", avgKernel, stdKernel);
-    printf("CPU Computation Time: Avg = %.3f ms, StdDev = %.3f ms\n", avgCpu, stdCpu);
+    printf("GPU Kernel Execution (Single Thread): Avg = %.3f ms, Std = %.3f ms\n", avgKernel, stdKernel);
+    printf("CPU Computation Time: Avg = %.3f ms, Std = %.3f ms\n", avgCpu, stdCpu);
     if (allTestsPassed)
         printf("Test PASSED: GPU and CPU results are equivalent!\n\n");
     else
         printf("Test FAILED: GPU and CPU results do not match.\n\n");
-    fprintf(csvSingleThread, "%d,%.3f±%.3f,%.3f±%.3f\n", dim, avgKernel, stdKernel, avgCpu, stdCpu);
+    fprintf(csvSingleThread, "%d,%.3f,%.3f,%.3f,%.3f\n", dim, avgKernel, stdKernel, avgCpu, stdCpu);
 
     cudaFree(devA);
     cudaFree(devB);
@@ -237,7 +258,7 @@ void runKernelOnlyExperiment(int dim, int blockSize, FILE* csvKernel) {
     float sum_kernel = 0, sq_sum_kernel = 0;
     for (int i = 0; i < NUM_ITER; ++i) {
         cudaEventRecord(startEvent, 0);
-        gpuMatrixMultiply<<<numBlocks, threadsPerBlock>>>(devA, devB, devC, dim);
+        gpuMatrixMultiply << <numBlocks, threadsPerBlock >> > (devA, devB, devC, dim);
         cudaEventRecord(stopEvent, 0);
         cudaEventSynchronize(stopEvent);
         float t = 0;
@@ -249,8 +270,8 @@ void runKernelOnlyExperiment(int dim, int blockSize, FILE* csvKernel) {
     float std_kernel = sqrt(sq_sum_kernel / NUM_ITER - avg_kernel * avg_kernel);
 
     printf("----- Kernel-Only: Matrix %dx%d, Block Width: %d -----\n", dim, dim, blockSize);
-    printf("GPU Kernel Execution: Avg = %.3f ms, StdDev = %.3f ms\n\n", avg_kernel, std_kernel);
-    fprintf(csvKernel, "%d,%d,%.3f\n", dim, blockSize, avg_kernel);
+    printf("GPU Kernel Execution: Avg = %.3f ms, Std = %.3f ms\n\n", avg_kernel, std_kernel);
+    fprintf(csvKernel, "%d,%d,%.3f,%.3f\n", dim, blockSize, avg_kernel, std_kernel);
 
     cudaFree(devA);
     cudaFree(devB);
@@ -271,16 +292,17 @@ int main(void) {
     int blockSizes[5] = { 2, 4, 8, 16, 32 };
 
     // Data Transfer Experiment.
-    FILE* csvTransfer = fopen("data_transfer_times.csv", "w");
+    /*FILE* csvTransfer = fopen("data_transfer_times.csv", "w");
     if (!csvTransfer) {
         printf("Error opening CSV file for data transfer experiments.\n");
         return EXIT_FAILURE;
     }
-    fprintf(csvTransfer, "Matrix_Size,HostToDevice,DeviceToHost\n");
+    // CSV header with units.
+    fprintf(csvTransfer, "Matrix_Size,H2D_time (ms),H2D_std (ms),D2H_time (ms),D2H_std (ms)\n");
     for (int i = 0; i < 5; ++i) {
         runDataTransferExperiment(matrixSizes[i], csvTransfer);
     }
-    fclose(csvTransfer);
+    fclose(csvTransfer);*/
 
     // Part 2: GPU vs CPU Comparison using Single-Thread Kernel.
     FILE* csvSingleThread = fopen("gpu_single_thread_times.csv", "w");
@@ -288,25 +310,27 @@ int main(void) {
         printf("Error opening CSV file for single-thread experiments.\n");
         return EXIT_FAILURE;
     }
-    fprintf(csvSingleThread, "Matrix_Size,GPU_SingleThread_Time,CPU_Time\n");
+    // CSV header with units.
+    fprintf(csvSingleThread, "Matrix_Size,GPU_SingleThread_time (ms),GPU_SingleThread_std (ms),CPU_time (ms),CPU_std (ms)\n");
     for (int i = 0; i < 3; ++i) {
         runSingleThreadExperiment(matrixSizesST[i], csvSingleThread);
     }
     fclose(csvSingleThread);
 
     // Part 3: Kernel-Only Experiments (Varying Block Sizes).
-    FILE* csvKernel = fopen("kernel_times.csv", "w");
+    /*FILE* csvKernel = fopen("kernel_times.csv", "w");
     if (!csvKernel) {
         printf("Error opening CSV file for kernel-only experiments.\n");
         return EXIT_FAILURE;
     }
-    fprintf(csvKernel, "Matrix_Size,Block_Size,Kernel_Time\n");
+    // CSV header with units.
+    fprintf(csvKernel, "Matrix_Size,Block_Size,Kernel_time (ms),Kernel_std (ms)\n");
     for (int i = 0; i < 5; ++i) {
         for (int j = 0; j < 5; ++j) {
             runKernelOnlyExperiment(matrixSizes[i], blockSizes[j], csvKernel);
         }
     }
-    fclose(csvKernel);
+    fclose(csvKernel);*/
 
     return 0;
 }

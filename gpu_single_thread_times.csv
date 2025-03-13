@@ -1,0 +1,4 @@
+Matrix_Size,GPU_SingleThread_time (ms),GPU_SingleThread_std (ms),CPU_time (ms),CPU_std (ms)
+256,9198.337,115.862,25.000,0.000
+512,78381.812,691.896,420.400,7.283
+1024,711571.688,1889.897,2731.000,546.741
